@@ -1,0 +1,7 @@
+# Ignore VSCODE user setup
+.vscode
+
+__*
+tests/pizza/
+pizzagz
+
