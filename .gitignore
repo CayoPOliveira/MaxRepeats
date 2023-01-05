@@ -1,7 +1,10 @@
 # Ignore VSCODE user setup
 .vscode
 
-__*
+# Ignore private files anf logs like __pycache__
+*__*
+
+# Ignore tests directories
 tests/pizza/
 pizzagz
 
