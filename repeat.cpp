@@ -29,22 +29,27 @@ map <char, int> Sigma = {
 int main(int argc, char* argv[]) {
 
     // Parâmetros padrão
-    bool type1 = true;
-    bool type2 = true;
+    bool type1 = false;
+    bool type2 = false;
     bool use_stl = false;
     bool use_stxxl = false;
     int mem_limit = 4096;
     string bwt_file = "";
     string lcp_file = "";
+    string output = "";
 
     // Parsing dos argumentos
-    while (int opt = getopt(argc, argv, "12stlstxxlm:lcp:bwt:") != -1) {
+    for(int opt = getopt(argc, argv, "12hm:s:f:o:"); opt != -1; opt = getopt(argc, argv, "12hm:s:f:o:") ) {
         switch (opt) {
             case '1':
                 type1 = true;
                 break;
             case '2':
                 type2 = true;
+                break;
+            case 'h':
+                // Show help mensage
+                return 1;
                 break;
             case 's':
                 if (optarg[0] == 't' && optarg[1] == 'l') {
@@ -59,11 +64,20 @@ int main(int argc, char* argv[]) {
             case 'm':
                 mem_limit = atoi(optarg);
                 break;
-            case 'b':
-                bwt_file = optarg;
+            case 'f':
+                if (string(optarg).ends_with(".lcp")) {
+                    lcp_file = optarg;
+                } else if (string(optarg).ends_with(".bwt")) {
+                    bwt_file = optarg;
+                } else if (string(optarg).ends_with(".sa")) {
+                    sa_file = optarg;
+                } else {
+                    cerr << "Unknown file type: " << optarg << endl;
+                    return 1;
+                }
                 break;
-            case 'l':
-                lcp_file = optarg;
+            case 'o':
+                output = optarg;
                 break;
             default:
                 cerr << "Unknown option: -" << optopt << endl;
@@ -77,6 +91,12 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // Nome de arquivos padrão com base no arquivo bwt
+    if(output.empty()){
+        size_t dot_pos = bwt_file.find_last_of(".");
+        output = bwt_file.substr(0, dot_pos);
+    }
+
     // Executa o programa com os parâmetros especificados
     cout << "Repetitions of Type 1: " << type1 << endl;
     cout << "Repetitions of Type 2: " << type2 << endl;
@@ -85,12 +105,11 @@ int main(int argc, char* argv[]) {
     cout << "Memory Limit: " << mem_limit << endl;
     cout << "BWT file: " << bwt_file << endl;
     cout << "LCP file: " << lcp_file << endl;
+    cout << "Output: " << output << endl;
 
-    // Nome de arquivos padrão com base no arquivo bwt
-    size_t dot_pos = bwt_file.find_last_of(".");
-    string out_file = bwt_file.substr(0, dot_pos);
 
-    if(type1 && !type2){
+    //if(type1 && !type2){
+    if(type1){
         if(use_stl){
             //FALTA: Abrir o arquivo e pegar a bwt
             char* bwt = NULL;
@@ -182,7 +201,8 @@ int main(int argc, char* argv[]) {
 
         }
     }
-    else if(!type1 && type2){
+    //else if(!type1 && type2){
+    if(type2){
         if(use_stl){
             //FALTA: Abrir o arquivo e pegar a bwt
             char* bwt = NULL;
