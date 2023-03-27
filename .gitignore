@@ -8,3 +8,8 @@
 tests/pizza/
 pizzagz
 
+# Ignore stxxl config build
+external/stxxl/build/
+external/stxxl/include/stxxl/bits/config.h
+
+
