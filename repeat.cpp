@@ -1,10 +1,11 @@
 #include <iostream>
-#include <getopt.h>
+#include <unistd.h>
 #include <stack>
 #include <bitset>
 #include <tuple>
 #include <map>
 #include <stxxl/stack>
+#include "external/egap/malloc_count/malloc_count.h"
 
 // STDL
 using namespace std;
@@ -26,25 +27,29 @@ map <char, int> Sigma = {
 };
 
 // Main
-int main(int argc, char* argv[]) {
+int main(int argc, char** argv) {
 
     // Parâmetros padrão
     bool type1 = false;
     bool type2 = false;
-    bool use_stl = false;
-    bool use_stxxl = false;
+    bool stl = false;
+    bool stxxl = false;
     int mem_limit = 4096;
     string bwt_file = "";
     string lcp_file = "";
+    string sa_file = "";
     string output = "";
 
     // Parsing dos argumentos
-    for(int opt = getopt(argc, argv, "12hm:s:f:o:"); opt != -1; opt = getopt(argc, argv, "12hm:s:f:o:") ) {
+    int opt;
+    while((opt = getopt(argc, argv, "12hms::o:")) != -1) {
         switch (opt) {
             case '1':
+                //Compute Repeat type 1
                 type1 = true;
                 break;
             case '2':
+                //Compute Repeat type 2
                 type2 = true;
                 break;
             case 'h':
@@ -52,46 +57,59 @@ int main(int argc, char* argv[]) {
                 return 1;
                 break;
             case 's':
+                // Define if will use stl, stxxl or both, default is stl
                 if (optarg[0] == 't' && optarg[1] == 'l') {
-                    use_stl = true;
+                    stl = true;
                 } else if (optarg[0] == 't' && optarg[1] == 'x' && optarg[2] == 'x' && optarg[3] == 'l') {
-                    use_stxxl = true;
+                    stxxl = true;
                 } else {
                     cerr << "Unknown option: -" << optopt << endl;
                     return 1;
                 }
                 break;
             case 'm':
+                // Define memory limit usage
                 mem_limit = atoi(optarg);
                 break;
-            case 'f':
-                if (string(optarg).ends_with(".lcp")) {
-                    lcp_file = optarg;
-                } else if (string(optarg).ends_with(".bwt")) {
-                    bwt_file = optarg;
-                } else if (string(optarg).ends_with(".sa")) {
-                    sa_file = optarg;
-                } else {
-                    cerr << "Unknown file type: " << optarg << endl;
-                    return 1;
-                }
-                break;
             case 'o':
+                // Output
                 output = optarg;
                 break;
             default:
-                cerr << "Unknown option: -" << optopt << endl;
-                return 1;
+                cerr << "Unknown option " << optarg << ": ABORTING" << endl;
+                // return 1;
+                break;
         }
     }
 
-    // Checa se os arquivos bwt e lcp foram especificados
-    if (bwt_file.empty() || lcp_file.empty()) {
-        cerr << "Missing .bwt or .lcp file" << endl;
+    //Defaults
+    if(!type1 and !type2) type1 = type2 = true;
+    if(!stl and !stxxl) stxxl = true;
+
+
+    // Files
+    for (int i = optind; i < argc; i++) {
+        if (string(argv[i]).ends_with(".lcp")) {
+            lcp_file = argv[i];
+        } else if (string(argv[i]).ends_with(".bwt")) {
+            bwt_file = argv[i];
+        } else if (string(argv[i]).ends_with(".sa")) {
+            sa_file = argv[i];
+        } else {
+            cerr << "Unknown file " << argv[i] << ": ABORTING" << endl;
+            return 1;
+        }
+    }
+
+    // Check files
+    if (bwt_file.empty() || lcp_file.empty() || sa_file.empty()) {
+        if(bwt_file.empty()) cerr << "Missing .bwt file" << endl;
+        if(lcp_file.empty()) cerr << "Missing .lcp file" << endl;
+        if(sa_file.empty()) cerr << "Missing .sa file" << endl;
         return 1;
     }
 
-    // Nome de arquivos padrão com base no arquivo bwt
+    // Output from bwt file name
     if(output.empty()){
         size_t dot_pos = bwt_file.find_last_of(".");
         output = bwt_file.substr(0, dot_pos);
@@ -100,17 +118,19 @@ int main(int argc, char* argv[]) {
     // Executa o programa com os parâmetros especificados
     cout << "Repetitions of Type 1: " << type1 << endl;
     cout << "Repetitions of Type 2: " << type2 << endl;
-    cout << "Use STL: " << use_stl << endl;
-    cout << "Use STXXL: " << use_stxxl << endl;
+    cout << "Use STL: " << stl << endl;
+    cout << "Use STXXL: " << stxxl << endl;
     cout << "Memory Limit: " << mem_limit << endl;
     cout << "BWT file: " << bwt_file << endl;
     cout << "LCP file: " << lcp_file << endl;
+    cout << "SA file: " << sa_file << endl;
     cout << "Output: " << output << endl;
 
 
     //if(type1 && !type2){
     if(type1){
-        if(use_stl){
+        if(stl){
+            return 0;
             //FALTA: Abrir o arquivo e pegar a bwt
             char* bwt = NULL;
             //FALTA: Abrir o arquivo e pegar a lcp
@@ -197,13 +217,14 @@ int main(int argc, char* argv[]) {
 
             //FALTA: Abrir o arquivo para salvar as repetições
         }
-        if(use_stxxl){
+        if(stxxl){
 
         }
     }
     //else if(!type1 && type2){
     if(type2){
-        if(use_stl){
+        if(stl){
+            return 0;
             //FALTA: Abrir o arquivo e pegar a bwt
             char* bwt = NULL;
             //FALTA: Abrir o arquivo e pegar a lcp
@@ -249,18 +270,20 @@ int main(int argc, char* argv[]) {
 
             //FALTA: Abrir o arquivo para salvar as repetições
         }
-        if(use_stxxl){
+        if(stxxl){
 
         }
     }
     else{ //Type1 and Type2
-        if(use_stl){
+        if(stl){
 
         }
-        if(use_stxxl){
+        if(stxxl){
 
         }
     }
+
+    return 0;
 }
 
 

@@ -12,4 +12,13 @@ pizzagz
 external/stxxl/build/
 external/stxxl/include/stxxl/bits/config.h
 
+# Ignore malloc_count.o
+malloc_count.o
+
+# Ignore compiled programs
+*.out
+repeats
+
+# Ignore fist code tests (In the end this can be deleted)
+firstCode.cpp
 
