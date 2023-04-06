@@ -7,8 +7,10 @@ import subprocess
 def run_eGap(mem_limit, file):
     path = "external/egap/"
     subprocess.run("make", cwd=path)
-    subprocess.run(["./eGap", "--lcp", "--sa", "--mem",
+    subprocess.run(["./eGap", "--lcp", "--sa", "--em","--mem",
                     str(mem_limit), f"../../{file}"], cwd=path)
+    # subprocess.run(["./eGap", "--lcp", "--sa", "--mem",
+    #                 str(mem_limit), f"../../{file}"], cwd=path)
 
 
 def get_args():
