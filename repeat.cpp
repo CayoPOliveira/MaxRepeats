@@ -1,11 +1,13 @@
 #include <iostream>
+#include <cstdio>
 #include <unistd.h>
 #include <stack>
+#include <vector>
 #include <bitset>
 #include <tuple>
 #include <map>
 #include <stxxl/stack>
-#include "external/egap/malloc_count/malloc_count.h"
+#include "external/malloc_count/malloc_count.h"
 
 // STDL
 using namespace std;
@@ -14,8 +16,14 @@ using namespace std;
 #define MIN_LEN_REPEAT1 1
 #define MIN_LEN_REPEAT2 1
 
+#define LCPBYTES 2
+#define SABYTES 4
+#define BWTBYTES 1
+
+#define TOTALBYTES ((LCPBYTES + SABYTES + BWTBYTES))
+
 // Alphabet Size
-#define SIGMA_N 6 //Sigma.size()
+#define SIGMA_N 128 //Sigma.size()
 // Alphabet Elements
 map <char, int> Sigma = {
   {'$', 0},
@@ -30,19 +38,20 @@ map <char, int> Sigma = {
 int main(int argc, char** argv) {
 
     // Parâmetros padrão
+    bool verbose = false;
     bool type1 = false;
     bool type2 = false;
     bool stl = false;
     bool stxxl = false;
     int mem_limit = 4096;
-    string bwt_file = "";
-    string lcp_file = "";
-    string sa_file = "";
+    string bwt_fname = "";
+    string lcp_fname = "";
+    string sa_fname = "";
     string output = "";
 
     // Parsing dos argumentos
     int opt;
-    while((opt = getopt(argc, argv, "12hms::o:")) != -1) {
+    while((opt = getopt(argc, argv, "12hvm:s:o:")) != -1) {
         switch (opt) {
             case '1':
                 //Compute Repeat type 1
@@ -56,6 +65,10 @@ int main(int argc, char** argv) {
                 // Show help mensage
                 return 1;
                 break;
+            case 'v':
+                // Verbose
+                verbose = true;
+                break;
             case 's':
                 // Define if will use stl, stxxl or both, default is stl
                 if (optarg[0] == 't' && optarg[1] == 'l') {
@@ -68,8 +81,8 @@ int main(int argc, char** argv) {
                 }
                 break;
             case 'm':
-                // Define memory limit usage
-                mem_limit = atoi(optarg);
+                // Define memory limit usage in MB
+                mem_limit = atoi(optarg)*1024*1024;
                 break;
             case 'o':
                 // Output
@@ -90,11 +103,11 @@ int main(int argc, char** argv) {
     // Files
     for (int i = optind; i < argc; i++) {
         if (string(argv[i]).ends_with(".lcp")) {
-            lcp_file = argv[i];
+            lcp_fname = argv[i];
         } else if (string(argv[i]).ends_with(".bwt")) {
-            bwt_file = argv[i];
+            bwt_fname = argv[i];
         } else if (string(argv[i]).ends_with(".sa")) {
-            sa_file = argv[i];
+            sa_fname = argv[i];
         } else {
             cerr << "Unknown file " << argv[i] << ": ABORTING" << endl;
             return 1;
@@ -102,44 +115,91 @@ int main(int argc, char** argv) {
     }
 
     // Check files
-    if (bwt_file.empty() || lcp_file.empty() || sa_file.empty()) {
-        if(bwt_file.empty()) cerr << "Missing .bwt file" << endl;
-        if(lcp_file.empty()) cerr << "Missing .lcp file" << endl;
-        if(sa_file.empty()) cerr << "Missing .sa file" << endl;
+    if (bwt_fname.empty() || lcp_fname.empty() || sa_fname.empty()) {
+        if(bwt_fname.empty()) cerr << "Missing .bwt file" << endl;
+        if(lcp_fname.empty()) cerr << "Missing .lcp file" << endl;
+        if(sa_fname.empty()) cerr << "Missing .sa file" << endl;
         return 1;
     }
 
     // Output from bwt file name
     if(output.empty()){
-        size_t dot_pos = bwt_file.find_last_of(".");
-        output = bwt_file.substr(0, dot_pos);
+        size_t dot_pos = bwt_fname.find_last_of(".");
+        output = bwt_fname.substr(0, dot_pos);
     }
 
+    if(verbose){
     // Executa o programa com os parâmetros especificados
-    cout << "Repetitions of Type 1: " << type1 << endl;
-    cout << "Repetitions of Type 2: " << type2 << endl;
-    cout << "Use STL: " << stl << endl;
-    cout << "Use STXXL: " << stxxl << endl;
-    cout << "Memory Limit: " << mem_limit << endl;
-    cout << "BWT file: " << bwt_file << endl;
-    cout << "LCP file: " << lcp_file << endl;
-    cout << "SA file: " << sa_file << endl;
-    cout << "Output: " << output << endl;
+        cout << "Repetitions of Type 1: " << type1 << endl;
+        cout << "Repetitions of Type 2: " << type2 << endl;
+        cout << "Use STL: " << stl << endl;
+        cout << "Use STXXL: " << stxxl << endl;
+        cout << "Memory Limit: " << mem_limit << endl;
+        cout << "BWT file: " << bwt_fname << endl;
+        cout << "LCP file: " << lcp_fname << endl;
+        cout << "SA file: " << sa_fname << endl;
+        cout << "Output: " << output << endl;
+    }
 
 
     //if(type1 && !type2){
     if(type1){
+        // Number that itens from files
+        size_t n = (mem_limit - (3 * sizeof(FILE*)) - sizeof(size_t) ) /
+                                                                (sizeof(char) + (2 * sizeof(size_t)));
         if(stl){
-            return 0;
-            //FALTA: Abrir o arquivo e pegar a bwt
-            char* bwt = NULL;
-            //FALTA: Abrir o arquivo e pegar a lcp
-            int* lcp = NULL;
-            int n = 0;
 
-            stack< pair<int, int> > repeats; // Return subsequences repeats type 1
+            char* bwt = (char*) malloc(n*sizeof(char));
+            size_t* lcp = (size_t*) malloc(n*sizeof(size_t));
+            size_t* sa = (size_t*) malloc(n*sizeof(size_t));
 
-            typedef struct element{
+            // HEAP: CHECK
+            if(bwt == NULL || sa == NULL || lcp == NULL){
+                if(bwt == NULL) {
+                    cerr << "Malloc bwt: NULL" << endl;
+                }
+                if(lcp == NULL) {
+                    cerr << "Malloc lcp: NULL" << endl;
+                }
+                if(sa == NULL) {
+                    cerr << "Malloc sa: NULL" << endl;
+                }
+                return 1;
+            }
+
+            // FILES: OPEN
+            FILE *BWTfile = fopen(bwt_fname, "rt");
+            FILE *LCPfile = fopen(lcp_fname, "rb");
+            FILE *SAfile = fopen(sa_fname, "rb");
+
+            FILE *OUTfile = fopen(output.append(".r1"), "wb");
+
+            // FILES: CHECK IF OPEN
+            if(BWTfile == NULL || SAfile == NULL || LCPfile == NULL) {
+                if(BWTfile == NULL) {
+                    cerr << "Problem to open " << bwt_fname << endl;
+                }
+                if(LCPfile == NULL) {
+                    cerr << "Problem to open " << lcp_fname << endl;
+                }
+                if(SAfile == NULL) {
+                    cerr << "Problem to open " << sa_fname << endl;
+                }
+                return 1;
+            }
+
+            // save repeats type 1
+            // vector < pair<int, int> > repeats;
+
+            typedef struct{
+                size_t pos;
+                size_t size;
+            } Entry;
+
+            Entry rp;
+
+            // STACK
+            typedef struct{
                 int pos;
                 int lcp;
                 bitset<SIGMA_N> B;
@@ -148,74 +208,99 @@ int main(int argc, char** argv) {
             Element Rp; //Auxiliar Element
             stack<Element> Stack; //Stack from pair <j, lcp[h]> and the bitvector
 
-            for (int i = 0; i < n; i++)
-            {
-                //Is a valid repeat
-                if(lcp[i]>=MIN_LEN_REPEAT1){
-                if(!Stack.empty()) Rp = Stack.top();
+            while(!feof(BWTfile)){
+                fread(bwt, BWTBYTES, n, BWTfile);
+                fread(lcp, LCPBYTES, n, LCPfile);
+                fread(sa, SABYTES, n, SAfile);
 
-                // Stack empty or
-                // Stack.top().lcp < lcp[i] (new possible repeat)
-                if (Stack.empty() || Rp.lcp < lcp[i])
+                for (int i = 0; i < n; i++)
                 {
-                    Rp.pos = i;
-                    Rp.lcp = lcp[i];
-                    Rp.B.reset();
-                    Rp.B.set(Sigma[bwt[i]]);
+                    //Is a valid repeat
+                    if(lcp[i]>=MIN_LEN_REPEAT1)
+                    {
+                        if(!Stack.empty()) Rp = Stack.top();
 
-                    Stack.push(Rp);
-                    continue;
-                }
+                        // Stack empty or
+                        // Stack.top().lcp < lcp[i] (new possible repeat)
+                        if (Stack.empty() || Rp.lcp < lcp[i])
+                        {
+                            Rp.pos = i;
+                            Rp.lcp = lcp[i];
+                            Rp.B.reset();
+                            Rp.B.set((int)bwt[i]);
+                            // Rp.B.set(Sigma[bwt[i]]);
 
-                //Update bitvector case lcp[i]==Stack.top().lcp
-                if (Rp.lcp == lcp[i]){
-                    Stack.pop();
-                    Rp.B.set(Sigma[bwt[i]]);
-                    Stack.push(Rp);
-                    continue;
-                }
-                }
+                            Stack.push(Rp);
+                            continue;
+                        }
 
-                // lcp[i] < Stack.top().lcp
-                // Pop and check the repeats
-                while (!Stack.empty() && lcp[i] < Rp.lcp)
-                {
-                    Stack.pop();
-                    // Is a repeat Type1 if there more than one diferent char
-                    if(Rp.B.count() > 1)
-                        repeats.push({Rp.pos, Rp.lcp});
+                        //Update bitvector case lcp[i]==Stack.top().lcp
+                        if (Rp.lcp == lcp[i]){
+                            Stack.pop();
+                            Rp.B.set(Sigma[bwt[i]]);
+                            Stack.push(Rp);
+                            continue;
+                        }
+                    }
 
-                    if(!Stack.empty()){
-                        bitset<SIGMA_N> AuxBitSet(Rp.B);
-                        Rp = Stack.top();
-                        Rp.B |= AuxBitSet;
+                    // lcp[i] < Stack.top().lcp
+                    // Pop and check the repeats
+                    while (!Stack.empty() && lcp[i] < Rp.lcp)
+                    {
+                        Stack.pop();
+                        // Is a repeat Type1 if there more than one diferent char
+                        if(Rp.B.count() > 1)
+                            rp.pos = Rp.pos;
+                            rp.size = Rp.lcp;
+                            fwrite(rp, sizeof(rp), 1, OUTfile);
+                            // repeats.push_back({Rp.pos, Rp.lcp});
+
+                        if(!Stack.empty()){
+                            bitset<SIGMA_N> AuxBitSet(Rp.B);
+                            Rp = Stack.top();
+                            Rp.B |= AuxBitSet;
+                        }
+                    }
+
+                    if(lcp[i]>=MIN_LEN_REPEAT1){
+                        // Case is a new repeat
+                        if (Stack.empty())
+                        {
+                            Rp.pos = i;
+                            Rp.lcp = lcp[i];
+                            Rp.B.reset();
+                            Rp.B.set(Sigma[bwt[i]]);
+
+                            Stack.push(Rp);
+                            continue;
+                        }
+                        // Case remain a pair with Stack.top().lcp < lcp[i]
+                        else if (Rp.lcp < lcp[i])
+                        {
+                            Rp.B.set(Sigma[bwt[i]]);
+                            Rp.lcp = lcp[i];
+
+                            Stack.push(Rp);
+                        }
                     }
                 }
 
-                if(lcp[i]>=MIN_LEN_REPEAT1){
-                // Case is a new repeat
-                if (Stack.empty())
-                {
-                    Rp.pos = i;
-                    Rp.lcp = lcp[i];
-                    Rp.B.reset();
-                    Rp.B.set(Sigma[bwt[i]]);
-
-                    Stack.push(Rp);
-                    continue;
-                }
-                // Case remain a pair with Stack.top().lcp < lcp[i]
-                else if (Rp.lcp < lcp[i])
-                {
-                    Rp.B.set(Sigma[bwt[i]]);
-                    Rp.lcp = lcp[i];
-
-                    Stack.push(Rp);
-                }
-                }
+                // if(repeats.size() != fwrite(repeats, sizeof(pair<int, int>), repeats.size(), OUTfile)){
+                //     cerr << "Problem to write repeats T1 in STL" << endl;
+                // }
+                // repeats.clear();
             }
+            // HEAP: FREE
+            free(bwt);
+            free(lcp);
+            free(sa);
 
-            //FALTA: Abrir o arquivo para salvar as repetições
+            // FILES: CLOSE AND CHECK
+            if(fclose(BWTfile) == EOF ) cerr << "Problem to close " << bwt_fname << endl;
+            if(fclose(LCPfile) == EOF ) cerr << "Problem to close " << lcp_fname << endl;
+            if(fclose(SAfile) == EOF ) cerr << "Problem to close " << sa_fname << endl;
+            if(fclose(OUTfile) == EOF ) cerr << "Problem to close " << output << endl;
+
         }
         if(stxxl){
 
