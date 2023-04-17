@@ -1,7 +1,7 @@
 from tests import pizzachili
 import argparse
 import subprocess
-# import os
+import os
 
 
 def run_eGap(mem_limit, file):
@@ -9,8 +9,6 @@ def run_eGap(mem_limit, file):
     subprocess.run("make", cwd=path)
     subprocess.run(["./eGap", "--lcp", "--sa", "--em","--mem",
                     str(mem_limit), f"../../{file}"], cwd=path)
-    # subprocess.run(["./eGap", "--lcp", "--sa", "--mem",
-    #                 str(mem_limit), f"../../{file}"], cwd=path)
 
 
 def get_args():
@@ -30,11 +28,13 @@ def get_args():
                         type=int, help='Memory limit in MB')
     parser.add_argument('-f', '--file', dest='file',
                         type=str, help='File path')
+    parser.add_argument(
+        '-v', dest='verbose', action='store_true', help='Verbose options on repeats')
 
     # Set default values for the arguments
     parser.set_defaults(type1=False, type2=False,
                         use_stl=False, use_stxxl=False,
-                        mem_limit=4096)
+                        mem_limit=4096, file="", verbose=False)
 
     # Parse the arguments
     args = parser.parse_args()
@@ -49,11 +49,38 @@ def get_args():
 
     return args
 
+def eGapPizza(args):
+    print("Pizza tests running...")
+    for filename in os.listdir("tests/pizza/"):
+        if filename.endswith('.txt'):
+            run_eGap(args.mem_limit, "tests/pizza/" + filename)
+
+def run_repeat(args):
+    print("Repeats Compile")
+    subprocess.run("make")
+    print("Repeats running...")
+    Run = ["./repeats", f"{args.file}", f"{args.file}.bwt", f"{args.file}.2.lcp", f"{args.file}.4.sa"]
+    if(args.type1): Run.append("-1")
+    if(args.type2): Run.append("-2")
+    if(args.use_stl): Run.append("-stl")
+    if(args.use_stxxl): Run.append("-stxxl")
+    if(args.mem_limit!=4096): Run.append("-m", str(args.mem_limit))
+    if(args.verbose): Run.append("-v")
+    subprocess.run(Run)
+
 
 def main():
     pizzachili.pizza()
     args = get_args()
-    run_eGap(args.mem_limit, args.file)
+    if(args.file == ""):
+        eGapPizza(args)
+        for filename in os.listdir("tests/pizza/"):
+            if filename.endswith('.txt'):
+                args.file = filename
+                run_repeat(args)
+    else:
+        # run_eGap(args.mem_limit, args.file)
+        run_repeat(args)
 
 
 if __name__ == "__main__":
