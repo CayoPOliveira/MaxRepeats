@@ -5,7 +5,7 @@ import os
 
 
 def run_eGap(mem_limit, file):
-    path = "external/egap/"
+    path = "external/eGap/"
     subprocess.run("make", cwd=path)
     subprocess.run(["./eGap", "--lcp", "--sa", "--em","--mem",
                     str(mem_limit), f"../../{file}"], cwd=path)
@@ -79,7 +79,7 @@ def main():
                 args.file = filename
                 run_repeat(args)
     else:
-        # run_eGap(args.mem_limit, args.file)
+        run_eGap(args.mem_limit, args.file)
         run_repeat(args)
 
 

@@ -1,3 +1,6 @@
 [submodule "external/malloc_count"]
 	path = external/malloc_count
 	url = https://github.com/bingmann/malloc_count
+[submodule "external/eGap"]
+	path = external/eGap
+	url = https://github.com/felipelouza/eGap
