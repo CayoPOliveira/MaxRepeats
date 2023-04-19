@@ -31,4 +31,4 @@ clean:
 	rm -rf ${PROJ_LABEL} malloc_count.o
 
 debugvalgrind: all
-	valgrind --leak-check=full --show-leak-kinds=all -s ./repeats -v -1 -stl -m 4096 tests/pizza/dblp.25MB.txt tests/pizza/dblp.25MB.txt.2.lcp tests/pizza/dblp.25MB.txt.4.sa tests/pizza/dblp.25MB.txt.bwt
+	valgrind --leak-check=yes --track-origins=yes ./repeats -v -1 -stl -m 4096 tests/pizza/dblp.25MB.txt tests/pizza/dblp.25MB.txt.2.lcp tests/pizza/dblp.25MB.txt.4.sa tests/pizza/dblp.25MB.txt.bwt
