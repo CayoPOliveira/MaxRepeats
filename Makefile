@@ -30,8 +30,11 @@ malloc_count.o: $(MC) $(MC:.c=.h)
 clean:
 	rm -rf ${PROJ_LABEL} malloc_count.o
 
-debugvalgrind: all
-	valgrind --leak-check=yes --track-origins=yes ./repeats -v -1 -stl -m 4096 tests/pizza/dblp.25MB.txt tests/pizza/dblp.25MB.txt.2.lcp tests/pizza/dblp.25MB.txt.4.sa tests/pizza/dblp.25MB.txt.bwt
+debugvalgrind:
+	${CC} ${CFLAGS} ${STXXL} ${MCLIB} ${MCSRC} -o ${PROJ_LABEL}
+	valgrind --leak-check=yes --track-origins=yes -s ./repeats -v -1 -stl -m 4096 tests/pizza/dblp.25MB.txt tests/pizza/dblp.25MB.txt.2.lcp tests/pizza/dblp.25MB.txt.4.sa tests/pizza/dblp.25MB.txt.bwt
+	sort tests/pizza/dblp.25MB.txt.bwt.rt1 | uniq -d
 
 debug: all
 	./repeats -v -1 -stl -m 4096 tests/pizza/dblp.25MB.txt tests/pizza/dblp.25MB.txt.2.lcp tests/pizza/dblp.25MB.txt.4.sa tests/pizza/dblp.25MB.txt.bwt
+	sort tests/pizza/dblp.25MB.txt.bwt.rt1 | uniq -d
