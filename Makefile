@@ -32,3 +32,6 @@ clean:
 
 debugvalgrind: all
 	valgrind --leak-check=yes --track-origins=yes ./repeats -v -1 -stl -m 4096 tests/pizza/dblp.25MB.txt tests/pizza/dblp.25MB.txt.2.lcp tests/pizza/dblp.25MB.txt.4.sa tests/pizza/dblp.25MB.txt.bwt
+
+debug: all
+	./repeats -v -1 -stl -m 4096 tests/pizza/dblp.25MB.txt tests/pizza/dblp.25MB.txt.2.lcp tests/pizza/dblp.25MB.txt.4.sa tests/pizza/dblp.25MB.txt.bwt
