@@ -1,12 +1,12 @@
 #include <iostream>
-#include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <unistd.h>
 #include <stack>
 #include <bitset>
 #include <map>
 #include <stxxl/stack>
-#include "external/malloc_count/malloc_count.h"
+// #include "external/malloc_count/malloc_count.h"
 
 // STDL
 using namespace std;
@@ -17,13 +17,11 @@ using namespace std;
 #define MIN_LEN_REPEAT1 1
 #define MIN_LEN_REPEAT2 1
 
+#define BWTBYTES 1
 #define LCPBYTES 2
 #define SABYTES 4
-#define BWTBYTES 1
-
 #define TOTALBYTES (BWTBYTES + LCPBYTES + SABYTES)
-
-// #define Fclose(x, y) (fclose(x) == EOF ? cout << "Problem to close " << y << endl : cout << y << " Closed\n")
+#define MAXREPEATSIZE (1 << (8 * LCPBYTES))
 
 // Alphabet Size
 #define SIGMA_N 6 // Sigma.size()
@@ -79,13 +77,21 @@ void *Malloc(size_t N)
     return p;
 }
 
+int readFiles(uint64_t N, uint8_t **bwt, FILE *BWT, uint16_t **lcp, FILE *LCP, uint32_t **sa, FILE *SA)
+{
+    size_t M = fread(*bwt, BWTBYTES, N, BWT);
+    if (M != fread(*lcp, LCPBYTES, N, LCP) || M != fread(*sa, SABYTES, N, SA))
+        return 0;
+    return M;
+}
+
 // Main
 int main(int argc, char **argv)
 {
-    extern int optind, opterr, optopt;
+    extern int optind;
     extern char *optarg;
 
-    // Parâmetros padrão //*
+    // Defaults
     bool verbose = false;
     bool type1 = false;
     bool type2 = false;
@@ -100,7 +106,7 @@ int main(int argc, char **argv)
     char *sa_fname = NULL;
     char *output = NULL;
 
-    // Parsing dos argumentos
+    // Parsing
     int opt;
     while ((opt = getopt(argc, argv, "12hvm:s:o:")) != -1)
     {
@@ -178,19 +184,26 @@ int main(int argc, char **argv)
     }
 
     // Check files
-    if (bwt_fname == NULL || lcp_fname == NULL || sa_fname == NULL)
+    if (bwt_fname == NULL)
     {
-        if (bwt_fname == NULL)
-            cout << "Missing .bwt file" << endl;
-        if (lcp_fname == NULL)
-            cout << "Missing .lcp file" << endl;
-        if (sa_fname == NULL)
-            cout << "Missing .sa file" << endl;
-        if (str_fname == NULL)
-            cout << "Missing .txt file" << endl;
+        cout << "Missing .bwt file" << endl;
         return 1;
     }
-
+    if (lcp_fname == NULL)
+    {
+        cout << "Missing .lcp file" << endl;
+        return 1;
+    }
+    if (sa_fname == NULL)
+    {
+        cout << "Missing .sa file" << endl;
+        return 1;
+    }
+    if (str_fname == NULL)
+    {
+        cout << "Missing .txt file" << endl;
+        return 1;
+    }
     // Output from bwt file name
     if (output == NULL)
     {
@@ -215,7 +228,7 @@ int main(int argc, char **argv)
     if (type1)
     {
         // Number that itens from files
-        uint32_t N = mem_limit / (BWTBYTES + LCPBYTES + SABYTES); // TOTALBYTES;
+        uint64_t N = (mem_limit - MAXREPEATSIZE) / (BWTBYTES + LCPBYTES + SABYTES); // TOTALBYTES;
         if (stl)
         {
 
@@ -251,8 +264,8 @@ int main(int argc, char **argv)
             uint16_t *lcp = (uint16_t *)Malloc(N * sizeof(uint16_t));
             uint32_t *sa = (uint32_t *)Malloc(N * sizeof(uint32_t));
 
-            size_t M = fread(bwt, BWTBYTES, N, BWTfile);
-            if (M != fread(lcp, LCPBYTES, N, LCPfile) || M != fread(sa, SABYTES, N, SAfile))
+            N = readFiles(N, &bwt, BWTfile, &lcp, LCPfile, &sa, SAfile);
+            if (!N)
             {
                 cout << "Error reading files\n";
                 Fclose(BWTfile);
@@ -263,11 +276,18 @@ int main(int argc, char **argv)
             }
 
             // STACK PART
-            while (!feof(STRfile) && !feof(BWTfile) && !feof(LCPfile) && !feof(SAfile) && !feof(OUTfile))
+            while (!feof(STRfile) && !feof(BWTfile) && !feof(LCPfile) && !feof(SAfile))
             {
                 for (uint32_t i = 0; i < N; i++)
                 {
-                    Rp = Stack.top();
+                    if (Stack.empty() && lcp[i] < MIN_LEN_REPEAT1)
+                        continue;
+
+                    if (!Stack.empty())
+                    {
+                        Rp = Stack.top();
+                        // cout << "Rp - sa:" << Rp.pos << ", lcp:" << Rp.lcp << endl;
+                    }
 
                     // Stack empty or
                     // Stack.top().lcp < lcp[i] (new possible repeat)
@@ -281,13 +301,11 @@ int main(int argc, char **argv)
 #else
                         Rp.B = 1 << bwt[i];
 #endif
-
                         Stack.push(Rp);
-                        continue;
                     }
 
                     // Update bitvector case lcp[i]==Stack.top().lcp
-                    if (lcp[i] >= MIN_LEN_REPEAT1 && Rp.lcp == lcp[i])
+                    else if (lcp[i] >= MIN_LEN_REPEAT1 && Rp.lcp == lcp[i])
                     {
                         Stack.pop();
 #if BITSET
@@ -296,55 +314,60 @@ int main(int argc, char **argv)
                         Rp.B |= 1 << bwt[i];
 #endif
                         Stack.push(Rp);
-                        continue;
                     }
 
                     // lcp[i] < Stack.top().lcp
-                    // Pop and check the repeats
-                    while (!Stack.empty() && Rp.lcp > lcp[i])
+                    else if (Rp.lcp > lcp[i])
                     {
-                        Stack.pop();
-                        // Is a repeat Type1 if there more than one diferent char
 #if BITSET
-                        if (Rp.B.count() > 1)
+                        bitset<ASCII> AuxBitSet(Rp.B);
 #else
-                        if (Rp.B - (Rp.B & -Rp.B) != 0) // At least 2 bit sets
+                        __uint128_t AuxBitSet = Rp.B;
 #endif
+                        // Pop and check the repeats
+                        while (!Stack.empty() && Rp.lcp > lcp[i])
                         {
-                            char *Repeat1 = (char *)Malloc(Rp.lcp + 2);
-                            Fseek(STRfile, Rp.pos, SEEK_SET);
-                            size_t k = fread(Repeat1, 1, Rp.lcp, STRfile);
-                            if (k != Rp.lcp)
+                            Stack.pop();
+
+                            // Is a repeat Type1 if there at least 2 diferent bwt chars
+#if BITSET
+                            if (Rp.B.count() > 1)
+#else
+                            if (Rp.B - (Rp.B & -Rp.B) != 0) // At least 2 bit sets
+#endif
                             {
-                                cout << "Repeat oversized from: " << Rp.pos << ", read: " << k << ", to lcp: " << Rp.lcp << ", doesn't exists\n";
-                                exit(1);
+                                // char *Repeat1 = (char *)Malloc((Rp.lcp + 2) * sizeof(char));
+                                char Repeat1[Rp.lcp + 1];
+                                Fseek(STRfile, Rp.pos, SEEK_SET);
+                                if (fread(Repeat1, sizeof(char), Rp.lcp, STRfile) != Rp.lcp)
+                                {
+                                    cout << "Repeat oversized from: " << Rp.pos << ", can't read lcp: " << Rp.lcp << ", doesn't exists\n";
+                                    exit(1);
+                                }
+                                Repeat1[Rp.lcp] = '\0';
+                                fprintf(OUTfile, "%s\n", Repeat1);
+                                // free(Repeat1);
                             }
-                            fprintf(OUTfile, "%s\n", Repeat1);
-                            free(Repeat1);
+
+                            if (!Stack.empty())
+                            {
+                                Rp = Stack.top();
+                                AuxBitSet |= Rp.B;
+                            }
                         }
 
                         if (!Stack.empty())
                         {
 #if BITSET
-                            bitset<ASCII> AuxBitSet(Rp.B);
+                            AuxBitSet.set((int)bwt[i] - 32);
 #else
-                            __uint128_t AuxBitSet = Rp.B;
+                            AuxBitSet |= 1 << bwt[i];
 #endif
-                            uint32_t p = Rp.pos;
-                            Rp = Stack.top();
-                            Stack.pop();
-                            Rp.B |= AuxBitSet;
-                            Stack.push(Rp);
-                            Rp.pos = p;
                             Rp.B = AuxBitSet;
+                            Stack.pop();
+                            Stack.push(Rp);
                         }
-                        Rp = Stack.top();
-                    }
-
-                    if (lcp[i] >= MIN_LEN_REPEAT1)
-                    {
-                        // Case is a new repeat
-                        if (Stack.empty())
+                        if (lcp[i] >= MIN_LEN_REPEAT1 && (Stack.empty() || Rp.lcp < lcp[i]))
                         {
                             Rp.pos = sa[i];
                             Rp.lcp = lcp[i];
@@ -355,27 +378,12 @@ int main(int argc, char **argv)
                             Rp.B = 1 << bwt[i];
 #endif
                             Stack.push(Rp);
-                            continue;
-                        }
-                        // Case remain a pair with Stack.top().lcp < lcp[i]
-                        else
-                        {
-                            if (Rp.lcp < lcp[i])
-                            {
-#if BITSET
-                                Rp.B.set((int)bwt[i] - 32);
-#else
-                                Rp.B |= 1 << bwt[i];
-#endif
-                                Rp.lcp = lcp[i];
-                                Stack.push(Rp);
-                            }
                         }
                     }
                 }
 
-                M = fread(bwt, BWTBYTES, N, BWTfile);
-                if (M != fread(lcp, LCPBYTES, N, LCPfile) || M != fread(sa, SABYTES, N, SAfile))
+                N = readFiles(N, &bwt, BWTfile, &lcp, LCPfile, &sa, SAfile);
+                if (!N)
                 {
                     cout << "Error reading files\n";
                     Fclose(BWTfile);
