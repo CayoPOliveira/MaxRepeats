@@ -30,22 +30,28 @@ def get_args():
                         type=str, help='File path')
     parser.add_argument(
         '-v', dest='verbose', action='store_true', help='Verbose options on repeats')
+    parser.add_argument(
+        '-e', '--eGap', dest='egap', action='store_true', help='Run eGap to make .sa, .lcp and .bwt files')
 
     # Set default values for the arguments
     parser.set_defaults(type1=False, type2=False,
                         use_stl=False, use_stxxl=False,
-                        mem_limit=4096, file="", verbose=False)
+                        mem_limit=4096, file="", verbose=False, egap=False)
 
     # Parse the arguments
     args = parser.parse_args()
 
     # Print the values of the arguments
-    print("Compute repeats type 1:", args.type1)
-    print("Compute repeats type 2:", args.type2)
-    print("Use STL stack in memory RAM:", args.use_stl)
-    print("Use STXXL stack in disk:", args.use_stxxl)
-    print("Memory limit in MB:", args.mem_limit)
-    print("File path:", args.file)
+    if args.verbose:
+        print("Compute repeats type 1:", args.type1)
+        print("Compute repeats type 2:", args.type2)
+        print("Use STL stack in memory RAM:", args.use_stl)
+        print("Use STXXL stack in disk:", args.use_stxxl)
+        print("Memory limit in KB:", args.mem_limit)
+        print("File path:", args.file)
+        if args.egap:
+            print("Run eGap.")
+
 
     return args
 
@@ -64,7 +70,9 @@ def run_repeat(args):
     if(args.type2): Run.append("-2")
     if(args.use_stl): Run.append("-stl")
     if(args.use_stxxl): Run.append("-stxxl")
-    if(args.mem_limit!=4096): Run.append("-m", str(args.mem_limit))
+    if(args.mem_limit!=4096):
+        Run.append("-m")
+        Run.append(str(args.mem_limit))
     if(args.verbose): Run.append("-v")
     subprocess.run(Run)
 
@@ -79,7 +87,8 @@ def main():
                 args.file = filename
                 run_repeat(args)
     else:
-        run_eGap(args.mem_limit, args.file)
+        if args.egap:
+            run_eGap(args.mem_limit, args.file)
         run_repeat(args)
 
 

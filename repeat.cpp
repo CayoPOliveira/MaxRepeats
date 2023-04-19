@@ -6,7 +6,7 @@
 #include <bitset>
 #include <map>
 #include <stxxl/stack>
-// #include "external/malloc_count/malloc_count.h"
+#include "external/malloc_count/malloc_count.h"
 
 // STDL
 using namespace std;
@@ -88,6 +88,8 @@ int readFiles(uint64_t N, uint8_t **bwt, FILE *BWT, uint16_t **lcp, FILE *LCP, u
 // Main
 int main(int argc, char **argv)
 {
+    cout << "\n____Repeats.cpp.log ___\n";
+
     extern int optind;
     extern char *optarg;
 
@@ -231,15 +233,12 @@ int main(int argc, char **argv)
         uint64_t N = (mem_limit - MAXREPEATSIZE) / (BWTBYTES + LCPBYTES + SABYTES); // TOTALBYTES;
         if (stl)
         {
-
             // FILES: OPEN
             FILE *STRfile = Fopen(str_fname, (char *)"rt");
             FILE *BWTfile = Fopen(bwt_fname, (char *)"rt");
             FILE *LCPfile = Fopen(lcp_fname, (char *)"rb");
             FILE *SAfile = Fopen(sa_fname, (char *)"rb");
 
-            // string out_fname = (output);
-            // out_fname += ".rt1"; // Final output
             if (verbose)
                 cout << "Output repeats type1: " << (string)(output) + ".rt1" << endl;
             FILE *OUTfile = Fopen((char *)((string)(output) + ".rt1").c_str(), (char *)"wt");
@@ -268,6 +267,7 @@ int main(int argc, char **argv)
             if (!N)
             {
                 cout << "Error reading files\n";
+                Fclose(STRfile);
                 Fclose(BWTfile);
                 Fclose(LCPfile);
                 Fclose(SAfile);
@@ -386,6 +386,7 @@ int main(int argc, char **argv)
                 if (!N)
                 {
                     cout << "Error reading files\n";
+                    Fclose(STRfile);
                     Fclose(BWTfile);
                     Fclose(LCPfile);
                     Fclose(SAfile);
@@ -399,22 +400,22 @@ int main(int argc, char **argv)
             {
                 Rp = Stack.top();
                 Stack.pop();
+                // Is a repeat Type1 if there at least 2 diferent bwt chars
 #if BITSET
                 if (Rp.B.count() > 1)
 #else
                 if (Rp.B - (Rp.B & -Rp.B) != 0) // At least 2 bit sets
 #endif
                 {
-                    uint8_t *Repeat1 = (uint8_t *)Malloc(Rp.lcp + 2);
+                    char Repeat1[Rp.lcp + 1];
                     Fseek(STRfile, Rp.pos, SEEK_SET);
-                    size_t k = fread(Repeat1, 1, Rp.lcp, STRfile);
-                    if (k != Rp.lcp)
+                    if (fread(Repeat1, sizeof(char), Rp.lcp, STRfile) != Rp.lcp)
                     {
-                        cout << "Repeat oversized from: " << Rp.pos << ", read: " << k << ", to lcp: " << Rp.lcp << ", doesn't exists\n";
+                        cout << "Repeat oversized from: " << Rp.pos << ", can't read lcp: " << Rp.lcp << ", doesn't exists\n";
                         exit(1);
                     }
+                    Repeat1[Rp.lcp] = '\0';
                     fprintf(OUTfile, "%s\n", Repeat1);
-                    free(Repeat1);
                 }
             }
 
@@ -499,5 +500,6 @@ int main(int argc, char **argv)
         }
     }
 
+    cout << "\n____Finishing Repeats.cpp.log___\n";
     return 0;
 }
