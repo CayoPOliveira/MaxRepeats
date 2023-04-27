@@ -27,11 +27,13 @@ def extract_and_split_file(filepath):
     with gzip.open(filepath, "rb") as f:
         content = f.read()
         content_str = content.decode("ISO-8859-1")
-        content_str = content_str.replace("\n", " ")
+        content_str = content_str.replace("\n", "")
         filename = os.path.splitext(os.path.basename(filepath))[
             0].split(".")[0]
 
-        for i, size in enumerate([25, 50, 75, 100]):
+        if not os.path.exists("pizza"):
+            os.makedirs("pizza")
+        for i, size in enumerate([20, 40, 60, 80, 100]):
             with open(f"pizza/{filename}.{size}MB.txt", "w") as f:
                 f.write(content_str[:size*1024*1024])
 
